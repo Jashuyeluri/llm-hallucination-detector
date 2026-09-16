@@ -6,7 +6,7 @@ from correction import correct_response
 
 def run_pipeline(source_text, llm_response, model=None, auto_correct=True):
     claims = extract_claims(llm_response, model=model)
-    results = check_all_claims(source_text, claims)
+    results = check_all_claims(source_text, claims, model=model)
     score = compute_faithfulness_score(results)
 
     corrected_response = None

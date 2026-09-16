@@ -1,58 +1,99 @@
-import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+"""Source-grounded claim verification using the configured LLM provider.
 
-_tokenizer = None
-_model = None
-_label2id = None
-MODEL_NAME = "MoritzLaurer/DeBERTa-v3-base-mnli"
+This replaces the local PyTorch/DeBERTa model so the application can run on a
+small cloud instance. The verifier is still source-only: it must not use its
+own background knowledge when assigning a label.
+"""
 
+import json
 
-def _load():
-    global _tokenizer, _model, _label2id
-    if _model is None:
-        # This model uses a SentencePiece tokenizer.  Keeping the slow
-        # tokenizer prevents newer Transformers releases from attempting to
-        # convert its binary spm.model file as if it were a TikToken model.
-        _tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=False)
-        _model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
-        _model.eval()
-        _label2id = {v.lower(): k for k, v in _model.config.id2label.items()}
-    return _tokenizer, _model, _label2id
+from llm_client import chat
 
 
-def check_claim(source_text, claim):
-    tokenizer, model, label2id = _load()
+VALID_LABELS = {"supported", "contradicted", "unsupported"}
 
-    inputs = tokenizer.encode(
-        source_text, claim,
-        return_tensors="pt",
-        truncation=True,
-        max_length=1024,
-    )
 
-    with torch.no_grad():
-        logits = model(inputs)[0]
+def _json_from_response(raw):
+    """Extract JSON from an LLM response that may include a Markdown fence."""
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else ""
+        if text.rstrip().endswith("```"):
+            text = text.rstrip()[:-3]
+    start = text.find("[")
+    end = text.rfind("]") + 1
+    if start < 0 or end <= start:
+        raise ValueError("Verifier did not return a JSON array.")
+    return json.loads(text[start:end])
 
-    probs = torch.softmax(logits, dim=1)[0]
-    contra_score = probs[label2id["contradiction"]].item()
-    neutral_score = probs[label2id["neutral"]].item()
-    entail_score = probs[label2id["entailment"]].item()
 
-    if entail_score > contra_score and entail_score > neutral_score:
-        label = "supported"
-    elif contra_score > entail_score and contra_score > neutral_score:
-        label = "contradicted"
+def _result(claim, label, confidence):
+    """Keep the result schema used by scoring.py and the browser UI."""
+    confidence = max(0.0, min(float(confidence), 1.0))
+    if label == "supported":
+        entailment, contradiction, neutral = confidence, 0.0, 1.0 - confidence
+    elif label == "contradicted":
+        entailment, contradiction, neutral = 0.0, confidence, 1.0 - confidence
     else:
-        label = "unsupported"
+        entailment, contradiction, neutral = 0.0, 0.0, confidence
 
     return {
         "claim": claim,
         "label": label,
-        "entailment_score": round(entail_score, 4),
-        "contradiction_score": round(contra_score, 4),
-        "neutral_score": round(neutral_score, 4),
+        "entailment_score": round(entailment, 4),
+        "contradiction_score": round(contradiction, 4),
+        "neutral_score": round(neutral, 4),
     }
 
 
-def check_all_claims(source_text, claims):
-    return [check_claim(source_text, c) for c in claims]
+def check_all_claims(source_text, claims, model=None):
+    """Classify all claims in one source-grounded LLM request.
+
+    Batching reduces API calls, latency, and cost. A claim is supported only
+    when the supplied source supports it; missing evidence is unsupported.
+    """
+    if not claims:
+        return []
+
+    numbered_claims = "\n".join(
+        f"{index}. {claim}" for index, claim in enumerate(claims)
+    )
+    prompt = f"""You are a strict source-grounded fact verifier.
+
+Use ONLY the source material below. Do not use outside knowledge and do not
+infer facts that the source does not state.
+
+SOURCE MATERIAL:
+{source_text}
+
+CLAIMS TO VERIFY:
+{numbered_claims}
+
+For every claim, return exactly one JSON array. Each array item must contain:
+- index: the claim number
+- label: one of supported, contradicted, unsupported
+- confidence: a number from 0 to 1
+
+Rules:
+- supported: the source explicitly supports the claim.
+- contradicted: the source explicitly states an incompatible fact.
+- unsupported: the source does not provide enough evidence either way.
+
+Return only JSON. Do not add Markdown, explanations, or extra keys."""
+
+    parsed = _json_from_response(chat(prompt, model=model))
+    by_index = {}
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        index = item.get("index")
+        label = str(item.get("label", "")).lower().strip()
+        if isinstance(index, int) and 0 <= index < len(claims) and label in VALID_LABELS:
+            by_index[index] = _result(claims[index], label, item.get("confidence", 0.5))
+
+    # An incomplete or malformed item is deliberately treated as unsupported,
+    # never as a verified fact.
+    return [
+        by_index.get(index, _result(claim, "unsupported", 0.0))
+        for index, claim in enumerate(claims)
+    ]

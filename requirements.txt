@@ -1,10 +1,6 @@
 fastapi
 uvicorn[standard]
 python-multipart
-torch
-transformers
-sentencepiece
-protobuf
 ollama
 groq
 pdfplumber

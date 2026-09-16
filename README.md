@@ -6,7 +6,7 @@ A custom-designed web dashboard (FastAPI backend + hand-built HTML/CSS/JS fronte
 
 ```
 claim_extraction.py    stage 2 — configured LLM extracts atomic claims
-entailment_check.py    stage 3 — DeBERTa-v3-MNLI checks each claim against the source
+entailment_check.py    stage 3 — configured LLM checks each claim against the source
 scoring.py              stage 4 — faithfulness score aggregation
 correction.py           stage 5 — configured LLM rewrites the response using verified facts
 llm_client.py            provider adapter for Ollama or Groq
@@ -37,15 +37,15 @@ Then open **http://127.0.0.1:8000** in your browser — this serves the custom d
 
 ## Notes
 
-- First run downloads `MoritzLaurer/DeBERTa-v3-base-mnli` (~370MB) automatically.
 - By default, the app uses Ollama, so Ollama must be running locally (`ollama serve`).
 - The frontend calls the backend at the same origin (`/api/check`), so no separate frontend server is needed — `uvicorn` serves both the API and the static dashboard.
 
 ## Deploy to Render with Groq
 
-The Docker image is ready for Groq. In Render, create a **Web Service** from
-this repository, choose **Docker**, and set the health-check path to
-`/api/health`.
+The Docker image is ready for Groq. It uses Groq for claim extraction,
+source-grounded verification, and response correction; it does not download a
+local PyTorch or DeBERTa model. In Render, create a **Web Service** from this
+repository, choose **Docker**, and set the health-check path to `/api/health`.
 
 Add these environment variables in Render's dashboard:
 
