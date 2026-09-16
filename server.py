@@ -24,7 +24,9 @@ async def api_check(request: Request):
 
         source_text = str(form.get("source_text", "") or "")
         llm_response = str(form.get("llm_response", "") or "")
-        model = str(form.get("model", "llama3") or "llama3")
+        # Model selection is configured through environment variables. This
+        # keeps cloud secrets and provider-specific model IDs out of the UI.
+        model = str(form.get("model", "") or "").strip() or None
 
         source_file = form.get("source_file")
         if source_file is not None and getattr(source_file, "filename", ""):
@@ -51,5 +53,11 @@ async def api_check(request: Request):
     except Exception as e:
         traceback.print_exc()
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.get("/api/health")
+async def health_check():
+    """Lightweight health endpoint for Render; it does not load ML models."""
+    return {"status": "ok"}
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

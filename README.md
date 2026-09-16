@@ -5,10 +5,11 @@ A custom-designed web dashboard (FastAPI backend + hand-built HTML/CSS/JS fronte
 ## Structure
 
 ```
-claim_extraction.py    stage 2 — Llama 3 extracts atomic claims
+claim_extraction.py    stage 2 — configured LLM extracts atomic claims
 entailment_check.py    stage 3 — DeBERTa-v3-MNLI checks each claim against the source
 scoring.py              stage 4 — faithfulness score aggregation
-correction.py           stage 5 — Llama 3 rewrites the response using verified facts
+correction.py           stage 5 — configured LLM rewrites the response using verified facts
+llm_client.py            provider adapter for Ollama or Groq
 pipeline.py             orchestrates source-document verification
 file_utils.py           reads uploaded .txt/.pdf files
 server.py               FastAPI backend, exposes /api/check and serves the frontend
@@ -37,5 +38,22 @@ Then open **http://127.0.0.1:8000** in your browser — this serves the custom d
 ## Notes
 
 - First run downloads `MoritzLaurer/DeBERTa-v3-base-mnli` (~370MB) automatically.
-- Ollama must be running locally (`ollama serve`) before using the app.
+- By default, the app uses Ollama, so Ollama must be running locally (`ollama serve`).
 - The frontend calls the backend at the same origin (`/api/check`), so no separate frontend server is needed — `uvicorn` serves both the API and the static dashboard.
+
+## Deploy to Render with Groq
+
+The Docker image is ready for Groq. In Render, create a **Web Service** from
+this repository, choose **Docker**, and set the health-check path to
+`/api/health`.
+
+Add these environment variables in Render's dashboard:
+
+```text
+LLM_PROVIDER=groq
+GROQ_API_KEY=your_private_groq_key
+GROQ_MODEL=openai/gpt-oss-20b
+```
+
+Do not store `GROQ_API_KEY` in the repository or Dockerfile. `GROQ_MODEL` may
+be changed to another Groq model ID without modifying the application code.

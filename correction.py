@@ -1,7 +1,7 @@
-import ollama
+from llm_client import chat
 
 
-def correct_response(source_text, llm_response, results, model='llama3'):
+def correct_response(source_text, llm_response, results, model=None):
     supported = [r["claim"] for r in results if r["label"] == "supported"]
     contradicted = [r["claim"] for r in results if r["label"] == "contradicted"]
     unsupported = [r["claim"] for r in results if r["label"] == "unsupported"]
@@ -38,5 +38,4 @@ Rewrite the response as ONE corrected paragraph. Rules:
 
 Return ONLY the corrected paragraph, no explanations, no headers."""
 
-    response = ollama.chat(model=model, messages=[{'role': 'user', 'content': prompt}])
-    return response['message']['content'].strip()
+    return chat(prompt, model=model).strip()

@@ -2,7 +2,9 @@ import os
 
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama").lower()
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama3-70b-8192")
+# Groq production model ID. It can be changed without a code deployment by
+# setting GROQ_MODEL in the host's environment variables.
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-20b")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3")
 
 
@@ -12,8 +14,9 @@ def chat(prompt, model=None):
     for cloud/hosted deployments, or leave as 'ollama' for local use."""
     if LLM_PROVIDER == "groq":
         return _chat_groq(prompt, model or GROQ_MODEL)
-    else:
+    if LLM_PROVIDER == "ollama":
         return _chat_ollama(prompt, model or OLLAMA_MODEL)
+    raise ValueError("LLM_PROVIDER must be either 'ollama' or 'groq'.")
 
 
 def _chat_ollama(prompt, model):

@@ -5,7 +5,6 @@ const responseFilename = document.getElementById("response-filename");
 const sourceText = document.getElementById("source-text");
 const responseText = document.getElementById("response-text");
 const runBtn = document.getElementById("run-btn");
-const modelChoice = document.getElementById("model-choice");
 const statusRow = document.getElementById("status-row");
 const statusText = document.getElementById("status-text");
 const results = document.getElementById("results");
@@ -61,7 +60,6 @@ runBtn.addEventListener("click", async () => {
   try {
     const formData = new FormData();
     formData.append("llm_response", responseText.value);
-    formData.append("model", modelChoice.value);
     if (responseFileInput.files[0]) formData.append("response_file", responseFileInput.files[0]);
 
     const endpoint = "/api/check";

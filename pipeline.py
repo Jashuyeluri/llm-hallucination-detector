@@ -4,7 +4,7 @@ from scoring import compute_faithfulness_score
 from correction import correct_response
 
 
-def run_pipeline(source_text, llm_response, model='llama3', auto_correct=True):
+def run_pipeline(source_text, llm_response, model=None, auto_correct=True):
     claims = extract_claims(llm_response, model=model)
     results = check_all_claims(source_text, claims)
     score = compute_faithfulness_score(results)

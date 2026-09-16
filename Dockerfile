@@ -11,9 +11,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+ENV PYTHONUNBUFFERED=1
 ENV LLM_PROVIDER=groq
-ENV PORT=7860
+ENV GROQ_MODEL=openai/gpt-oss-20b
 
-EXPOSE 7860
+EXPOSE 10000
 
 CMD ["sh", "-c", "uvicorn server:app --host 0.0.0.0 --port ${PORT}"]

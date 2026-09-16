@@ -1,16 +1,15 @@
-import ollama
 import json
+from llm_client import chat
 
 
-def extract_claims(text, model='llama3'):
+def extract_claims(text, model=None):
     prompt = f"""Break the following text into a list of atomic factual claims. Each claim should be a single, standalone, verifiable statement. Return ONLY a JSON array of strings, no other text, no markdown formatting.
 
 Text: {text}
 
 JSON array:"""
 
-    response = ollama.chat(model=model, messages=[{'role': 'user', 'content': prompt}])
-    raw = response['message']['content'].strip()
+    raw = chat(prompt, model=model).strip()
 
     if raw.startswith("```"):
         raw = raw.strip("`")
